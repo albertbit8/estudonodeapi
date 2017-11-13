@@ -154,6 +154,13 @@ server.get('/api/order/sell', function(req, res){
     });
 });
 
+server.get('/api/hello', function(req, res){
+    res.json(
+        "HELLO SERVER"
+    );
+});
+
+
 function ensureToken(req, res, next) {
     const bearerHeader = req.headers["authorization"];
     if (typeof bearerHeader !== 'undefined') {
@@ -169,4 +176,6 @@ function ensureToken(req, res, next) {
 server.listen(port, function(){
     console.log("NEW API - porta " + port);
 }); 
+
+
 
