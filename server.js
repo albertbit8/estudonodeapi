@@ -1,11 +1,16 @@
 'use strict';
 
 const express = require('express');
+var validator = require('express-validator');
+
 const http = require('http');
 const bodyParser = require('body-parser');
+
 const BlockIo = require('block_io');
 const block_io_paramrs = require('./config/blockIoparams');
 const block_io = new BlockIo(block_io_paramrs.apiToken, block_io_paramrs.apiPin, block_io_paramrs.version);
+
+
 
 var connection = require('./config/database');
 
@@ -15,32 +20,81 @@ var jwt = require('jsonwebtoken');
 var server = express();
 server.use(bodyParser.urlencoded({ extended: false }));
 server.use(bodyParser.json());
+server.use(validator());
+
+server.use(function(req, res, next) {  
+  console.log('%s %s %s', req.method, req.url, req.headers['x-forwarded-for'] || req.connection.remoteAddress);
+  next();
+});
 
 const port = 3000;
 
-server.post('/api/teste', function(req, res){
-    let userlabel = req.params('username');
-    let email = req.params('email');
-    let password = req.params('password');
-    let cpassword = req.params('cpassword');
-    let secretpin = req.params('secretpin');
+
+server.post('/api/teste', function(req, res, next){
+    req.checkBody('username', 'username can not null').notEmpty();
+    req.checkBody('email', 'email can not null').notEmpty();
+    req.checkBody('password', 'password can not null').notEmpty();
+    req.checkBody('cpassword', 'cpassword can not null').notEmpty();
+    req.checkBody('secretpin', 'secretpin can not null').notEmpty();
+
+    req.checkBody("email", "Enter a valid email address.").isEmail();
+    
+    let userName = req.body.username;
+    let email = req.body.email;
+    let password = req.body.password;
+    let cpassword = req.body.cpassword;
+    let secretpin = req.body.secretpin;
+
+    var errors = req.validationErrors();
+    if (errors) {      
+        res.status(422).json(errors);      
+    } else {
+
+        connection.getConnection(function(error, tempCont){
+            if(!!error){
+                tempCont.release();
+                console.log(error);
+            }else{
+                try {
+                    console.log("Conectado!");
+                    tempCont.query('SELECT username FROM btc_users WHERE username = ? or email = ?', [userName, email],  function(error, rows, fields){
+                        tempCont.release();
+                        if(!!error){
+                            console.log(error);
+                        }
+                        else{
+                            console.log("Busca na /api/users");
+                            console.log(rows);
+                            if(rows){
+                                res.json('username ou email já sendo utilizado');
+                            }
+                            
+
+                        }
+                    });
+                } catch (err) {
+                    res.json('Erro ao buscar user no banco');
+                }
+       
+            }
+        });
+
+        block_io.get_new_address({'label': 'usr_' + userName }, function(error, data){
+            if (error) {
+                console.log("Error occured:", error.message);
+                res.json({
+                    'error': error.message
+                });
+            }
+            else{
+                console.log(data);  
+                
+            }       
+        });
+        
+    }
 
 
-
-    // block_io.get_new_address({'label': 'testeApiNode2'}, function(error, data){
-    //     if (error) {
-    //         console.log("Error occured:", error.message);
-    //         res.json({
-    //             'error': error.message
-    //         });
-    //     }
-    //     else{
-    //         console.log(data);  
-    //         res.json({
-    //             data
-    //         });
-    //     }       
-    // });
 });
 
 server.get('/api/login', function(req, res){
